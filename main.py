@@ -42,16 +42,15 @@ class HttpHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         pr_url = urllib.parse.urlparse(self.path)
         if pr_url.path == '/':
-            self.send_html_file('index.html')
+            self.send_html_file('templates/index.html')
         elif pr_url.path == '/message':
-            self.send_html_file('message.html')
+            self.send_html_file('templates/message.html')
         elif pr_url.path == '/read':
-            self.send_json_to_html('read.html')
+            self.send_json_to_html('templates/read.html')
+        elif pr_url.path.startswith('/static/'):
+            self.send_static()
         else:
-            if pathlib.Path().joinpath(pr_url.path[1:]).exists():
-                self.send_static()
-            else:
-                self.send_html_file('error.html', 404)
+            self.send_html_file('templates/error.html', 404)
 
     def send_html_file(self, filename, status=200):
         self.send_response(status)
@@ -61,14 +60,15 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.wfile.write(fd.read())
 
     def send_static(self):
+        file_path = pathlib.Path(self.path.lstrip("/"))
         self.send_response(200)
-        mt = mimetypes.guess_type(self.path)
+        mt = mimetypes.guess_type(file_path)
         if mt:
             self.send_header("Content-type", mt[0])
         else:
             self.send_header("Content-type", 'text/plain')
         self.end_headers()
-        with open(f'.{self.path}', 'rb') as file:
+        with open(file_path, 'rb') as file:
             self.wfile.write(file.read())
 
     def send_json_to_html(self, filename):
@@ -81,8 +81,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         except (FileNotFoundError, json.JSONDecodeError):
             data = {}
 
-        env = Environment(loader=FileSystemLoader('.'))
-        template = env.get_template(filename)
+        env = Environment(loader=FileSystemLoader('templates'))
+        template = env.get_template('read.html')
         html_content = template.render(data=data)
 
         self.send_response(200)
